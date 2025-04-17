@@ -17,6 +17,7 @@ export const messagesApi = {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
+      .eq('deleted', false)  // 只获取未删除的消息
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -39,13 +40,19 @@ export const messagesApi = {
     return data[0]
   },
 
-  // 删除消息
+  // 软删除消息
   async deleteMessage(messageId, userId, isAdmin) {
-    const { error } = await supabase
+    const query = supabase
       .from('messages')
-      .delete()
-      .match({ id: messageId })
-      .match(isAdmin ? {} : { user_id: userId })
+      .update({ deleted: true })
+      .eq('id', messageId)
+    
+    // 如果不是管理员，添加用户ID限制
+    if (!isAdmin) {
+      query.eq('user_id', userId)
+    }
+
+    const { error } = await query
 
     if (error) throw error
     return true
@@ -59,6 +66,7 @@ export const messagesApi = {
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
+      .eq('deleted', false)  // 只计算未删除的消息
       .gte('created_at', twentyFourHoursAgo);
 
     if (error) {

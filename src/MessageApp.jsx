@@ -70,9 +70,9 @@ const theme = createTheme({
   },
 })
 
-const MessageBubble = ({ message, onDelete, isOwner }) => (
+const MessageBubble = ({ message, onDelete, isOwner, isAdminMessage }) => (
   <Paper
-    className="pixel-bubble"
+    className={`pixel-bubble ${isAdminMessage ? 'admin-bubble' : ''}`}
     sx={{
       p: 2,
       mb: 2,
@@ -83,7 +83,23 @@ const MessageBubble = ({ message, onDelete, isOwner }) => (
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: 2
+      gap: 2,
+      ...(isAdminMessage && {
+        backgroundColor: '#4a148c !important',
+        border: '4px solid #7c43bd',
+        boxShadow: '4px 4px 0 rgba(255, 105, 180, 0.5)',
+        '& .MuiTypography-root': {
+          color: '#ff8dc3',
+          fontWeight: 'bold',
+          position: 'relative',
+          '&::before': {
+            content: '"[管理员]"',
+            color: '#ff69b4',
+            marginRight: '8px',
+            fontWeight: 'normal'
+          }
+        }
+      })
     }}
   >
     <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
@@ -93,9 +109,9 @@ const MessageBubble = ({ message, onDelete, isOwner }) => (
       <IconButton
         onClick={onDelete}
         sx={{
-          color: '#ff69b4',
+          color: isAdminMessage ? '#ffffff' : '#ff69b4',
           '&:hover': {
-            color: '#ff8dc3',
+            color: isAdminMessage ? '#ff69b4' : '#ff8dc3',
             transform: 'scale(1.1)'
           }
         }}
@@ -120,26 +136,16 @@ function MessageApp() {
   const fetchMessages = useCallback(async () => {
     try {
       const data = await messagesApi.getMessages();
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data)) {
         setMessages(data);
       } else {
-        // 如果没有消息数据，使用默认消息
-        setMessages([
-          { id: 1, text: '想对主人说的话...', user_id: 'system', deleted: false, original_text: '想对主人说的话...' },
-          { id: 2, text: '想对奴隶说的话...', user_id: 'system', deleted: false, original_text: '想对奴隶说的话...' },
-          { id: 3, text: '想对玩伴说的话...', user_id: 'system', deleted: false, original_text: '想对玩伴说的话...' },
-        ]);
+        setMessages([]); // 如果没有消息，就设置为空数组
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
       setSnackbarMessage(`加载留言失败：${error.message || '请检查网络连接'}`);
       setSnackbarOpen(true);
-      // 发生错误时使用默认消息
-      setMessages([
-        { id: 1, text: '想对主人说的话...', user_id: 'system', deleted: false, original_text: '想对主人说的话...' },
-        { id: 2, text: '想对奴隶说的话...', user_id: 'system', deleted: false, original_text: '想对奴隶说的话...' },
-        { id: 3, text: '想对玩伴说的话...', user_id: 'system', deleted: false, original_text: '想对玩伴说的话...' },
-      ]);
+      setMessages([]); // 发生错误时也设置为空数组
     }
   }, []);
 
@@ -187,7 +193,7 @@ function MessageApp() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (newMessage.trim() && userId) {
+    if (newMessage.trim()) {
       // 检查留言频率限制
       if (!isAdmin) {
         try {
@@ -205,45 +211,28 @@ function MessageApp() {
         }
       }
 
-      // Filter message content (keep existing logic)
-      const bdsm_terms = ['dom', 'sub', 'master', 'slave', 'pet', 'switch', 'top', 'bottom']
-      const filtered_message = newMessage.trim().replace(/\b(?!(?:${bdsm_terms.join('|')})\b)[a-zA-Z0-9]+(?:[-.s][a-zA-Z0-9]+)*\b/g, match => {
-        if (
-          (/[0-9].*[a-zA-Z]|[a-zA-Z].*[0-9]/.test(match)) ||
-          (/^\d{6,}$/.test(match)) ||
-          (/^[a-zA-Z]{8,}$/.test(match))
-        ) {
-          return '*'.repeat(match.length)
-        }
-        return match
-      })
-
+      // 准备消息数据
       const messageData = {
-        text: filtered_message,
-        userId: userId,
+        text: newMessage.trim(),
+        userId: isAdmin ? 'admin' : userId, // 如果是管理员，使用 'admin' 作为 user_id
         originalText: newMessage.trim()
       };
 
       try {
         const savedMessage = await messagesApi.createMessage(messageData);
         if (!savedMessage) {
-          // It's better practice to let the API call throw an error
-          // throw new Error('保存留言失败：服务器未返回数据');
-          // If createMessage resolves without error but returns falsy, handle it
           console.warn('createMessage returned unexpected value:', savedMessage);
           setSnackbarMessage('留言似乎成功，但服务器未返回确认信息');
           setSnackbarOpen(true);
-          // Optionally, still update UI optimistically or refetch
-          // setMessages([...messages, { ...messageData, id: Date.now() }]); // Placeholder ID
         } else {
-          setMessages([savedMessage, ...messages]); // Prepend new message
+          // 更新消息列表
+          await fetchMessages(); // 重新获取所有消息以确保正确的排序
           setNewMessage('');
           setSnackbarMessage('留言成功！');
           setSnackbarOpen(true);
         }
       } catch (error) {
-        console.error("详细错误信息:", error); // Log the full error object
-        // Try to extract a more specific message from Supabase error structure
+        console.error("详细错误信息:", error);
         const specificError = error?.details || error?.message || error?.error_description || '未知错误';
         setSnackbarMessage(`留言失败：${specificError}`);
         setSnackbarOpen(true);
@@ -251,31 +240,25 @@ function MessageApp() {
     }
   }
 
-  const handleDelete = async (index) => {
-    const messageToDelete = messages[index];
-    // Keep owner check, but rely on backend for final authorization
-    if (!isAdmin && messageToDelete.userId !== userId) {
-      setSnackbarMessage('只能删除自己的留言！');
-      setSnackbarOpen(true);
-      return;
-    }
-
+  const handleDelete = async (messageId, messageUserId) => {
+    console.log('Handling delete:', { messageId, messageUserId, userId, isAdmin });
     try {
-      await messagesApi.deleteMessage(messageToDelete.id, userId, isAdmin);
-
-      // Optimistically update UI or refetch
-      // Option 1: Optimistic update (remove immediately)
-      const newMessages = messages.filter((_, i) => i !== index);
-      setMessages(newMessages);
-      
-      // Option 2: Refetch messages after delete
-      // fetchMessages(); 
-
-      setSnackbarMessage('删除成功！');
+      // 显示删除中的提示
+      setSnackbarMessage('正在删除...');
       setSnackbarOpen(true);
+
+      const success = await messagesApi.deleteMessage(messageId, userId, isAdmin);
+      console.log('Message deleted, success:', success);
+      
+      if (success) {
+        // 删除成功后立即重新获取消息列表
+        await fetchMessages();
+        setSnackbarMessage('删除成功！');
+      }
     } catch (error) {
-      console.error("Error deleting message:", error);
+      console.error("删除消息时出错:", error);
       setSnackbarMessage(`删除失败：${error.message}`);
+    } finally {
       setSnackbarOpen(true);
     }
   }
@@ -298,6 +281,20 @@ function MessageApp() {
     setSnackbarMessage('已退出管理员模式！')
     setSnackbarOpen(true)
   }
+
+  // 添加定期刷新消息的功能
+  useEffect(() => {
+    // 初始加载
+    fetchMessages();
+
+    // 设置定期刷新（每30秒）
+    const refreshInterval = setInterval(() => {
+      fetchMessages();
+    }, 30000);
+
+    // 清理函数
+    return () => clearInterval(refreshInterval);
+  }, [fetchMessages]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -354,16 +351,25 @@ function MessageApp() {
             gap: 2,
             alignItems: 'start'
           }}>
-            {messages.map((message, index) => (
-              (!message.deleted || isAdmin) && (
+            {messages
+              .sort((a, b) => {
+                // 首先按管理员消息排序
+                const aIsAdmin = a.user_id === 'admin';
+                const bIsAdmin = b.user_id === 'admin';
+                if (aIsAdmin && !bIsAdmin) return -1;
+                if (!aIsAdmin && bIsAdmin) return 1;
+                // 然后按时间排序
+                return new Date(b.created_at) - new Date(a.created_at);
+              })
+              .map((message) => (
                 <MessageBubble
-                  key={index}
+                  key={message.id}
                   message={isAdmin ? message.original_text : message.text}
-                  onDelete={() => handleDelete(index)}
+                  onDelete={() => handleDelete(message.id, message.user_id)}
                   isOwner={isAdmin || message.user_id === userId}
+                  isAdminMessage={message.user_id === 'admin'}
                 />
-              )
-            ))}
+              ))}
           </Box>
         </Container>
         
@@ -434,6 +440,23 @@ function MessageApp() {
           }
           .pixel-bubble {
             background-color: #fff0f5 !important;
+          }
+          .admin-bubble {
+            position: relative;
+            overflow: visible !important;
+          }
+          .admin-bubble::after {
+            content: '★';
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            color: #ff69b4;
+            font-size: 24px;
+            animation: spin 2s linear infinite;
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
           }
         `}</style>
 
