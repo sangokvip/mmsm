@@ -14,67 +14,102 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export const messagesApi = {
   // 获取所有消息
   async getMessages() {
+    console.log('Fetching messages...');
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('deleted', false)  // 只获取未删除的消息
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
 
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('Error fetching messages:', error);
+      throw error;
+    }
+    console.log('Fetched messages:', data);
+    return data || [];
   },
 
   // 创建新消息
   async createMessage({ text, userId, originalText }) {
+    console.log('Creating message:', { text, userId, originalText });
     const { data, error } = await supabase
       .from('messages')
       .insert([{
         text,
         user_id: userId,
-        original_text: originalText,
-        deleted: false
+        original_text: originalText
       }])
-      .select()
+      .select();
 
-    if (error) throw error
-    return data[0]
+    if (error) {
+      console.error('Error creating message:', error);
+      throw error;
+    }
+    console.log('Created message:', data);
+    return data[0];
   },
 
-  // 软删除消息
+  // 删除消息
   async deleteMessage(messageId, userId, isAdmin) {
-    const query = supabase
-      .from('messages')
-      .update({ deleted: true })
-      .eq('id', messageId)
-    
-    // 如果不是管理员，添加用户ID限制
-    if (!isAdmin) {
-      query.eq('user_id', userId)
+    console.log('Deleting message:', { messageId, userId, isAdmin });
+    try {
+      // 首先检查消息是否存在
+      const { data: message, error: fetchError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('id', messageId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching message:', fetchError);
+        throw new Error('查找消息时出错');
+      }
+
+      if (!message) {
+        console.error('Message not found:', messageId);
+        throw new Error('消息不存在');
+      }
+
+      // 检查权限
+      if (!isAdmin && message.user_id !== userId) {
+        console.error('Permission denied:', { messageUserId: message.user_id, userId });
+        throw new Error('无权限删除此消息');
+      }
+
+      // 直接删除消息
+      const { error: deleteError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (deleteError) {
+        console.error('Error deleting message:', deleteError);
+        throw new Error('删除消息时出错');
+      }
+
+      console.log('Message deleted successfully:', messageId);
+      return true;
+    } catch (error) {
+      console.error('Delete message error:', error);
+      throw error;
     }
-
-    const { error } = await query
-
-    if (error) throw error
-    return true
   },
 
   // 计算用户在过去24小时内的留言数量
   async countUserMessagesInLast24Hours(userId) {
+    console.log('Counting messages for user:', userId);
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { count, error } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('deleted', false)  // 只计算未删除的消息
       .gte('created_at', twentyFourHoursAgo);
 
     if (error) {
       console.error('Error counting messages:', error);
-      // 返回一个较大的数，以防出错时允许无限发送
-      // 或者可以抛出错误，让调用者处理
-      return Infinity; 
+      return Infinity;
     }
-    return count;
+    console.log('Message count:', count);
+    return count || 0;
   }
 }
