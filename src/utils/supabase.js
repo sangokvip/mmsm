@@ -593,5 +593,74 @@ export const messagesApi = {
       console.error('统计留言和回复数量时发生错误:', error);
       return Infinity; // 返回无限大，确保用户无法发送新消息直到错误解决
     }
+  },
+
+  // 管理员更新反应数量
+  async updateReactionCount(messageId, reactionType, count) {
+    console.log(`正在更新消息 ${messageId} 的${reactionType === 'likes' ? '点赞' : '点踩'}数量为 ${count}`);
+    try {
+      if (!messageId) {
+        throw new Error('消息ID不能为空');
+      }
+
+      if (count < 0) {
+        throw new Error('反应数量不能为负数');
+      }
+
+      // 检查消息是否存在
+      const { data: message, error: messageError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('id', messageId)
+        .single();
+
+      if (messageError) {
+        console.error('获取消息失败:', messageError);
+        throw new Error('获取消息失败');
+      }
+
+      if (!message) {
+        throw new Error('消息不存在');
+      }
+
+      // 首先删除该消息的所有该类型反应
+      const { error: deleteError } = await supabase
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('is_like', reactionType === 'likes');
+
+      if (deleteError) {
+        console.error('删除现有反应失败:', deleteError);
+        throw new Error('更新反应数量失败');
+      }
+
+      // 如果新的数量大于0，则添加对应数量的反应
+      if (count > 0) {
+        // 创建要插入的反应数组
+        const reactionsToInsert = Array.from({ length: count }, (_, i) => ({
+          message_id: messageId,
+          user_id: `admin_reaction_${i}`, // 使用特殊的用户ID表示这是管理员创建的
+          is_like: reactionType === 'likes',
+          created_at: new Date().toISOString()
+        }));
+
+        // 批量插入新的反应
+        const { error: insertError } = await supabase
+          .from('message_reactions')
+          .insert(reactionsToInsert);
+
+        if (insertError) {
+          console.error('添加新反应失败:', insertError);
+          throw new Error('更新反应数量失败');
+        }
+      }
+
+      console.log(`成功更新${reactionType === 'likes' ? '点赞' : '点踩'}数量为 ${count}`);
+      return true;
+    } catch (error) {
+      console.error(`更新${reactionType === 'likes' ? '点赞' : '点踩'}数量失败:`, error);
+      throw new Error(`更新${reactionType === 'likes' ? '点赞' : '点踩'}数量失败: ${error.message || '未知错误'}`);
+    }
   }
 }
