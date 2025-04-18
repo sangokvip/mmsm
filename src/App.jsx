@@ -868,23 +868,19 @@ function App() {
             >
               保存为PDF
             </Button>
-            <Button
-              onClick={handleShareToWeChat}
-              variant="contained" color="info"
-              className="pixel-button-pink"
-            >
-              分享到微信
-            </Button>
-            <Button
-              onClick={() => setOpenReport(false)}
-              variant="outlined"
-              color="error"
-              startIcon={<CloseIcon />}
-              className="pixel-button-pink"
-            >
-              关闭报告
-            </Button>
           </DialogActions>
+          <IconButton
+            onClick={() => setOpenReport(false)}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: '#ff69b4'
+            }}
+            className="pixel-button-pink"
+          >
+            <CloseIcon />
+          </IconButton>
         </Dialog>
 
         <Snackbar

@@ -935,21 +935,18 @@ function App() {
             >
               保存为PDF
             </Button>
-            <Button
-              onClick={handleShareToWeChat}
-              variant="contained" color="info"
-            >
-              分享到微信
-            </Button>
-            <Button
-              onClick={() => setOpenReport(false)}
-              variant="outlined"
-              color="error"
-              startIcon={<CloseIcon />}
-            >
-              关闭报告
-            </Button>
           </DialogActions>
+          <IconButton
+            onClick={() => setOpenReport(false)}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: 'rgba(0, 0, 0, 0.54)'
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
         </Dialog>
 
         <Snackbar

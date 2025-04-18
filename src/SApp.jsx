@@ -852,27 +852,25 @@ function SApp() {
           </Button>
           <Button 
             onClick={handleExportPDF} 
-            variant="outlined" 
-            color="primary"
+            variant="contained" 
+            color="secondary"
             className="pixel-button-red"
           >
             保存为PDF
           </Button>
-          <Button 
-            onClick={handleShareToWeChat} 
-            variant="outlined" 
-            color="primary"
-            className="pixel-button-red"
-          >
-            分享
-          </Button>
-          <IconButton 
-            onClick={() => setOpenReport(false)}
-            sx={{ position: 'absolute', top: 8, right: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
         </DialogActions>
+        <IconButton 
+          onClick={() => setOpenReport(false)}
+          sx={{ 
+            position: 'absolute', 
+            right: 8, 
+            top: 8,
+            color: '#ff0000'
+          }}
+          className="pixel-button-red"
+        >
+          <CloseIcon />
+        </IconButton>
       </Dialog>
 
       {/* 提示消息 */}
