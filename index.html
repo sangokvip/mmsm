@@ -39,7 +39,7 @@
         justify-content: center;
         align-items: center;
         background: var(--background);
-        font-family: 'Press Start 2P', cursive;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         padding: 1rem;
       }
 
@@ -58,6 +58,7 @@
         text-transform: uppercase;
         margin-bottom: 1rem;
         letter-spacing: 2px;
+        font-family: 'Press Start 2P', cursive;
       }
 
       .card {
@@ -102,7 +103,10 @@
       .female-button { background: var(--female); }
       .male-button { background: var(--male); }
       .s-button { background: var(--s-type); }
-      .message-button { background: var(--message); }
+      .message-button { 
+        background: var(--message); 
+        font-family: 'Press Start 2P', cursive;
+      }
 
       @media (max-width: 640px) {
         .container {

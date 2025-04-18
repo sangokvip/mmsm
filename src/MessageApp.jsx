@@ -1264,7 +1264,7 @@ function MessageApp() {
             <Container maxWidth="lg">
               <Toolbar sx={{ justifyContent: 'space-between' }}>
                 <Typography variant="h6" className="pixel-title-pink" sx={{ color: '#ff69b4' }}>
-                  留言板
+                  留言板-XR无下限
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   {isAdmin && (
