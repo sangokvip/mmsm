@@ -449,7 +449,7 @@ function App() {
             padding: { xs: '8px 16px', md: '8px 24px' },
             minHeight: { xs: '56px', md: '64px' },
             '& .MuiButton-root': {
-              fontFamily: '"Press Start 2P", cursive',
+              fontFamily: 'inherit',
               fontSize: '0.8rem',
               border: '2px solid #fff',
               '&:hover': {
@@ -470,7 +470,7 @@ function App() {
             }}>
               <ScienceIcon sx={{ display: 'flex' }} />
               <Typography variant="h5" sx={{
-                fontFamily: '"Press Start 2P", cursive',
+                fontFamily: 'inherit',
                 fontWeight: 'bold',
                 color: 'white',
                 display: 'flex',
@@ -494,6 +494,7 @@ function App() {
               justifyContent: 'flex-end',
               '& .MuiButton-root': {
                 border: '2px solid #fff',
+                fontFamily: 'inherit',
                 '&:hover': {
                   background: '#fff',
                   color: '#000'
@@ -533,21 +534,21 @@ function App() {
       >
         <Box sx={{ width: 250, pt: 2 }}>
           <List>
-            <ListItem button component="a" href="/index.html" onClick={() => setMobileMenuOpen(false)}>
+            <ListItem button component="a" href="/index.html" onClick={() => setMobileMenuOpen(false)} sx={{ fontFamily: 'inherit' }}>
               <ListItemIcon><HomeIcon /></ListItemIcon>
-              <ListItemText primary="首页" />
+              <ListItemText primary="首页" primaryTypographyProps={{ fontFamily: 'inherit' }} />
             </ListItem>
-            <ListItem button component="a" href="/s.html" onClick={() => setMobileMenuOpen(false)}>
+            <ListItem button component="a" href="/s.html" onClick={() => setMobileMenuOpen(false)} sx={{ fontFamily: 'inherit' }}>
               <ListItemIcon><ScienceIcon /></ListItemIcon>
-              <ListItemText primary="S版" />
+              <ListItemText primary="S版" primaryTypographyProps={{ fontFamily: 'inherit' }} />
             </ListItem>
-            <ListItem button component="a" href="/female.html" onClick={() => setMobileMenuOpen(false)}>
+            <ListItem button component="a" href="/female.html" onClick={() => setMobileMenuOpen(false)} sx={{ fontFamily: 'inherit' }}>
               <ListItemIcon><FemaleIcon /></ListItemIcon>
-              <ListItemText primary="女生版" />
+              <ListItemText primary="女生版" primaryTypographyProps={{ fontFamily: 'inherit' }} />
             </ListItem>
-            <ListItem button component="a" href="/message.html" onClick={() => setMobileMenuOpen(false)}>
+            <ListItem button component="a" href="/message.html" onClick={() => setMobileMenuOpen(false)} sx={{ fontFamily: 'inherit' }}>
               <ListItemIcon><MessageIcon /></ListItemIcon>
-              <ListItemText primary="留言板" />
+              <ListItemText primary="留言板" primaryTypographyProps={{ fontFamily: 'inherit' }} />
             </ListItem>
           </List>
         </Box>
@@ -607,7 +608,7 @@ function App() {
               size="large"
               startIcon={<AutorenewIcon />}
               className="pixel-button"
-              sx={{ fontFamily: '"Press Start 2P", cursive' }}
+              sx={{ fontFamily: 'inherit' }}
               onClick={() => {
                 const newRatings = {};
                 Object.entries(CATEGORIES).forEach(([category, items]) => {

@@ -81,7 +81,7 @@ const Footer = ({ pixelStyle = false, pinkStyle = false, redStyle = false }) => 
             color="white"
             sx={{
               ...(pixelStyle && {
-                fontFamily: '"Press Start 2P", cursive',
+                fontFamily: 'inherit',
                 fontSize: '0.8rem',
                 textShadow: '2px 2px 0px #000000',
               })
@@ -105,7 +105,7 @@ const Footer = ({ pixelStyle = false, pinkStyle = false, redStyle = false }) => 
               sx={{
                 color: 'white',
                 ...(pixelStyle && {
-                  fontFamily: '"Press Start 2P", cursive',
+                  fontFamily: 'inherit',
                   fontSize: '0.8rem',
                   textShadow: '2px 2px 0px #000000',
                   '&:hover': {
@@ -124,7 +124,7 @@ const Footer = ({ pixelStyle = false, pinkStyle = false, redStyle = false }) => 
               sx={{
                 color: 'white',
                 ...(pixelStyle && {
-                  fontFamily: '"Press Start 2P", cursive',
+                  fontFamily: 'inherit',
                   fontSize: '0.8rem',
                   textShadow: '2px 2px 0px #000000',
                   '&:hover': {
@@ -143,7 +143,7 @@ const Footer = ({ pixelStyle = false, pinkStyle = false, redStyle = false }) => 
               sx={{
                 color: 'white',
                 ...(pixelStyle && {
-                  fontFamily: '"Press Start 2P", cursive',
+                  fontFamily: 'inherit',
                   fontSize: '0.8rem',
                   textShadow: '2px 2px 0px #000000',
                   '&:hover': {

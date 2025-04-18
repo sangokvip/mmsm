@@ -35,8 +35,9 @@ const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: '"Press Start 2P", cursive',
+    fontFamily: 'inherit',
     h3: {
+      fontFamily: '"Press Start 2P", cursive',
       fontWeight: 700,
       color: '#ff69b4',
       textShadow: '2px 2px 0 #4a148c',
@@ -61,7 +62,7 @@ const theme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          fontFamily: '"Press Start 2P", cursive',
+          fontFamily: 'inherit',
           border: '3px solid #ff69b4',
           boxShadow: '3px 3px 0 rgba(74, 20, 140, 0.5)',
           '&:hover': {
@@ -146,15 +147,7 @@ const MessageReply = ({ reply, onDelete, isOwner, isAdminMessage }) => (
       sx={{ 
         wordBreak: 'break-word',
         color: isAdminMessage ? '#ffffff' : 'inherit',
-        fontSize: { xs: '0.75rem', sm: '0.875rem' },
-        ...(isAdminMessage && {
-          '&::before': {
-            content: '"[管理员]"',
-            color: '#ff69b4',
-            marginRight: '8px',
-            fontWeight: 'normal'
-          }
-        })
+        fontSize: { xs: '0.75rem', sm: '0.875rem' }
       }}
     >
       {reply.text}
@@ -229,13 +222,7 @@ const MessageBubble = ({
           '& .MuiTypography-root:not(.reaction-count)': {
             color: '#ff8dc3',
             fontWeight: 'bold',
-            position: 'relative',
-            '&::before': {
-              content: '"[管理员]"',
-              color: '#ff69b4',
-              marginRight: '8px',
-              fontWeight: 'normal'
-            }
+            position: 'relative'
           }
         }),
         ...(isPinned && {
@@ -639,13 +626,7 @@ const TopMessages = ({ messages }) => (
               color: 'text.secondary',
               ...(message.user_id === 'admin' && {
                 color: '#4a148c',
-                fontWeight: 'bold',
-                '&::before': {
-                  content: '"[管理员]"',
-                  color: '#ff69b4',
-                  marginRight: '8px',
-                  fontWeight: 'normal'
-                }
+                fontWeight: 'bold'
               })
             }}
           >
