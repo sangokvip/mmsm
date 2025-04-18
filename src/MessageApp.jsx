@@ -659,8 +659,6 @@ function MessageApp() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [openLogin, setOpenLogin] = useState(false);
-  const [password, setPassword] = useState('');
   const [userId, setUserId] = useState(null);
   const [messageReactions, setMessageReactions] = useState({});
   const [messageReplies, setMessageReplies] = useState({});
@@ -845,6 +843,13 @@ function MessageApp() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (newMessage.trim()) {
+      // 添加字数限制检查
+      if (newMessage.trim().length > 200) {
+        setSnackbarMessage('留言不能超过200字');
+        setSnackbarOpen(true);
+        return;
+      }
+
       // 检查留言频率限制（仅对非管理员用户）
       if (!isAdmin) {
         try {
@@ -878,7 +883,7 @@ function MessageApp() {
           setSnackbarMessage('留言似乎成功，但服务器未返回确认信息');
           setSnackbarOpen(true);
         } else {
-          await fetchMessages(); // 只在发送消息成功后刷新
+          await fetchMessages();
           setNewMessage('');
           setSnackbarMessage('留言成功！');
           setSnackbarOpen(true);
@@ -893,6 +898,19 @@ function MessageApp() {
         }
         setSnackbarOpen(true);
       }
+    }
+  };
+
+  // 添加双击标题处理函数
+  const handleTitleDoubleClick = () => {
+    const password = prompt('请输入管理员密码：');
+    if (password === 'Sangok#3') {
+      setIsAdmin(true);
+      setSnackbarMessage('管理员登录成功！');
+      setSnackbarOpen(true);
+    } else if (password !== null) {
+      setSnackbarMessage('密码错误！');
+      setSnackbarOpen(true);
     }
   };
 
@@ -977,24 +995,11 @@ function MessageApp() {
     }
   };
 
-  const handleLogin = () => {
-    if (password === 'Sangok#3') {
-      setIsAdmin(true)
-      setOpenLogin(false)
-      setPassword('')
-      setSnackbarMessage('管理员登录成功！')
-      setSnackbarOpen(true)
-    } else {
-      setSnackbarMessage('密码错误！')
-      setSnackbarOpen(true)
-    }
-  }
-
   const handleLogout = () => {
-    setIsAdmin(false)
-    setSnackbarMessage('已退出管理员模式！')
-    setSnackbarOpen(true)
-  }
+    setIsAdmin(false);
+    setSnackbarMessage('已退出管理员模式！');
+    setSnackbarOpen(true);
+  };
 
   // 渲染主要内容
   const renderContent = () => {
@@ -1117,7 +1122,11 @@ function MessageApp() {
   return (
     <ErrorBoundary>
       <ThemeProvider theme={theme}>
-        <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
+        <Box sx={{ 
+          minHeight: '100vh', 
+          backgroundColor: 'background.default',
+          pb: '120px' // 添加底部填充，为固定定位的输入框留出空间
+        }}>
           <AppBar
             position="sticky"
             sx={{
@@ -1126,6 +1135,7 @@ function MessageApp() {
               borderBottom: '4px solid #ff69b4',
               boxShadow: '4px 4px 0 rgba(255, 105, 180, 0.5)',
               mb: 3,
+              zIndex: 1100, // 确保导航栏在最上层
             }}
             className="pixel-theme-pink"
           >
@@ -1135,15 +1145,17 @@ function MessageApp() {
                   留言板
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Button
-                    color="inherit"
-                    startIcon={isAdmin ? <LogoutIcon /> : <LoginIcon />}
-                    onClick={isAdmin ? handleLogout : () => setOpenLogin(true)}
-                    className="pixel-button-pink"
-                    sx={{ color: '#ff69b4' }}
-                  >
-                    {isAdmin ? '退出管理' : '管理员登录'}
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      color="inherit"
+                      startIcon={<LogoutIcon />}
+                      onClick={handleLogout}
+                      className="pixel-button-pink"
+                      sx={{ color: '#ff69b4' }}
+                    >
+                      退出管理
+                    </Button>
+                  )}
                   <Button
                     color="inherit"
                     startIcon={<HomeIcon />}
@@ -1158,8 +1170,26 @@ function MessageApp() {
             </Container>
           </AppBar>
 
-          <Container maxWidth="lg" sx={{ pb: 4, mb: 10 }}>
-            <Typography variant="h3" className="pixel-title-pink" sx={{ mb: 4 }}>
+          <Container 
+            maxWidth="lg" 
+            sx={{ 
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 3,
+              position: 'relative', // 添加相对定位
+              minHeight: 'calc(100vh - 200px)', // 减去顶部导航栏和底部输入框的高度
+            }}
+          >
+            <Typography 
+              variant="h3" 
+              className="pixel-title-pink" 
+              sx={{ 
+                mb: 4,
+                cursor: 'default',
+                userSelect: 'none'
+              }}
+              onDoubleClick={handleTitleDoubleClick}
+            >
               I Love Dirty Talk
             </Typography>
 
@@ -1168,6 +1198,7 @@ function MessageApp() {
               flexDirection: 'column',
               gap: 3,
               width: '100%',
+              flexGrow: 1, // 允许内容区域伸展
               '& > *': {
                 width: '100%',
                 maxWidth: '100%'
@@ -1203,18 +1234,22 @@ function MessageApp() {
               backgroundColor: '#fff0f5',
               zIndex: 1000,
               borderTop: '4px solid #ff69b4',
-              boxShadow: '0 -4px 0 rgba(255, 105, 180, 0.5)'
+              boxShadow: '0 -4px 0 rgba(255, 105, 180, 0.5)',
+              maxHeight: '120px', // 限制最大高度
+              overflowY: 'auto' // 如果内容过多允许滚动
             }}
             className="pixel-theme-pink"
           >
             <TextField
               fullWidth
               multiline
-              rows={{ xs: 1, sm: 2 }}
+              rows={2}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="说点什么..."
+              placeholder="说点什么...(最多200字)"
               variant="outlined"
+              inputProps={{ maxLength: 200 }}
+              helperText={`${newMessage.length}/200`}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   '& fieldset': {
@@ -1228,6 +1263,11 @@ function MessageApp() {
                     borderColor: '#ff69b4',
                   },
                 },
+                '& .MuiFormHelperText-root': {
+                  color: newMessage.length > 180 ? '#ff4081' : '#666',
+                  marginLeft: 'auto',
+                  marginRight: 0
+                }
               }}
             />
             <Button
@@ -1255,27 +1295,6 @@ function MessageApp() {
             onClose={() => setSnackbarOpen(false)}
             message={snackbarMessage}
           />
-
-          <Dialog open={openLogin} onClose={() => setOpenLogin(false)}>
-            <DialogTitle>管理员登录</DialogTitle>
-            <DialogContent>
-              <TextField
-                autoFocus
-                margin="dense"
-                label="密码"
-                type="password"
-                fullWidth
-                variant="outlined"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenLogin(false)}>取消</Button>
-              <Button onClick={handleLogin}>登录</Button>
-            </DialogActions>
-          </Dialog>
         </Box>
       </ThemeProvider>
     </ErrorBoundary>
