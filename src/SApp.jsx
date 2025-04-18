@@ -14,6 +14,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import MaleIcon from '@mui/icons-material/Male'
 import FemaleIcon from '@mui/icons-material/Female'
 import Footer from './components/Footer'
+import MessageIcon from '@mui/icons-material/Message'
 
 // MENU_ITEMS定义移到函数组件内部
 
@@ -180,144 +181,96 @@ function SApp() {
     })
   }
 
-  const getBarData = (category) => {
-    return CATEGORIES[category].map(item => ({
-      name: item,
-      value: (() => {
+  const getGroupedRatings = () => {
+    const groupedRatings = {}
+    Object.entries(CATEGORIES).forEach(([category, items]) => {
+      items.forEach(item => {
         const rating = getRating(category, item)
-        switch(rating) {
-          case 'SSS': return 6
-          case 'SS': return 5
-          case 'S': return 4
-          case 'Q': return 3
-          case 'N': return 2
-          case 'W': return 1
-          default: return 0
+        if (!groupedRatings[rating]) {
+          groupedRatings[rating] = []
         }
-      })()
-    }))
+        groupedRatings[rating].push({ category, item })
+      })
+    })
+    // 按照指定顺序返回结果
+    const orderedRatings = {}
+    const ratingOrder = ['SSS', 'SS', 'S', 'Q', 'W', 'N']
+    ratingOrder.forEach(rating => {
+      if (groupedRatings[rating] && groupedRatings[rating].length > 0) {
+        orderedRatings[rating] = groupedRatings[rating]
+      }
+    })
+    return orderedRatings
   }
 
   const handleExportImage = async () => {
     if (reportRef.current) {
       try {
-        const reportElement = reportRef.current;
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        
-        // 创建一个新的容器元素
+        // 创建一个新的容器元素，用于生成图片
         const container = document.createElement('div');
         container.style.position = 'absolute';
         container.style.left = '-9999px';
-        container.style.top = '-9999px';
-        container.style.width = '1200px'; // 固定宽度以确保一致的布局
+        container.style.width = '1200px'; // 固定宽度
         container.style.backgroundColor = '#ffffff';
+        container.style.padding = '40px';
         document.body.appendChild(container);
 
         // 克隆报告元素
-        const clonedReport = reportElement.cloneNode(true);
+        const clonedReport = reportRef.current.cloneNode(true);
         container.appendChild(clonedReport);
 
-        // 修改导出图片的网格布局为每行3列
-        const optionsGrids = clonedReport.querySelectorAll('.options-grid');
-        optionsGrids.forEach(grid => {
-          grid.style.display = 'grid';
-          grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
-          grid.style.gap = '1rem';
-          grid.style.width = '100%';
-          grid.style.margin = '0 auto';
-          // 确保每个选项有足够的空间
-          const optionItems = grid.querySelectorAll('.option-item');
-          optionItems.forEach(item => {
-            item.style.minWidth = '0';
-            item.style.flexWrap = 'nowrap';
-            item.style.overflow = 'hidden';
-            item.style.fontSize = '1.8em';
-            // 增大评分等级说明的字体
-            const ratingText = item.querySelector('.rating-text');
-            if (ratingText) {
-              ratingText.style.fontSize = '1.6em';
-            }
-          });
-        });
-
-        // 预处理克隆的元素
-        const dialogElement = clonedReport.querySelector('[role="dialog"]');
-        if (dialogElement) {
-          dialogElement.style.position = 'relative';
-          dialogElement.style.transform = 'none';
-          dialogElement.style.top = '0';
-          dialogElement.style.left = '0';
-          dialogElement.style.width = '100%';
-          dialogElement.style.height = 'auto';
-          dialogElement.style.maxHeight = 'none';
-          dialogElement.style.overflow = 'visible';
-          dialogElement.style.display = 'block';
-          dialogElement.style.margin = '0';
-          dialogElement.style.padding = '2rem';
-          dialogElement.style.boxSizing = 'border-box';
-
-          // 增大标题字体
-          const titles = dialogElement.querySelectorAll('.section-title');
-          titles.forEach(title => {
-            title.style.fontSize = '2.2em';
-          });
-
-          // 增大图表字体
-          const charts = dialogElement.querySelectorAll('.recharts-text');
-          charts.forEach(text => {
-            text.style.fontSize = '1.6em';
-          });
-        }
+        // 设置固定布局样式
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+          .MuiGrid-container {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 16px !important;
+            width: 100% !important;
+          }
+          .MuiGrid-item {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: none !important;
+            padding: 0 !important;
+          }
+          .MuiPaper-root {
+            height: 100% !important;
+          }
+          .MuiTypography-root {
+            font-size: 16px !important;
+          }
+          .MuiTypography-h4 {
+            font-size: 32px !important;
+            margin-bottom: 32px !important;
+          }
+          .MuiTypography-h5 {
+            font-size: 24px !important;
+            margin-bottom: 16px !important;
+          }
+          .recharts-wrapper {
+            width: 600px !important;
+            height: 400px !important;
+            margin: 0 auto 32px !important;
+          }
+        `;
+        container.appendChild(styleSheet);
 
         // 确保所有图表都已渲染
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // 预加载二维码图片
-        await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = () => {
-            console.error('QR code image failed to load');
-            resolve();
-          };
-          img.src = '/qrcode.png';
-          // 确保图片完全加载
-          if (img.complete) {
-            resolve();
-          }
-        });
-        
-        // 增加额外延迟确保图片加载
-        await new Promise(resolve => setTimeout(resolve, 200));
-
+        // 生成图片
         const canvas = await html2canvas(container, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
-          logging: true,
           backgroundColor: '#ffffff',
-          imageTimeout: 15000,
+          width: 1200,
+          height: container.offsetHeight,
           onclone: (clonedDoc) => {
             const charts = clonedDoc.querySelectorAll('.recharts-wrapper');
             charts.forEach(chart => {
-              chart.style.width = '100%';
-              chart.style.height = 'auto';
-            });
-            
-            // 确保二维码图片能够被正确渲染
-            const qrCodeImages = clonedDoc.querySelectorAll('img[alt="QR Code"]');
-            qrCodeImages.forEach(img => {
-              // 确保图片已加载并可见
-              if (img.src.includes('/qrcode.png')) {
-                img.style.visibility = 'visible';
-                img.style.display = 'block';
-                // 强制设置图片源为绝对路径
-                const absolutePath = new URL('/qrcode.png', window.location.origin).href;
-                img.src = absolutePath;
-                // 确保图片尺寸正确
-                img.width = 200;
-                img.height = 200;
-              }
+              chart.style.margin = '0 auto';
             });
           }
         });
@@ -325,66 +278,44 @@ function SApp() {
         // 清理临时元素
         document.body.removeChild(container);
 
-        // 将Canvas转换为Blob对象
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/png', 1.0)
-        })
+        // 将Canvas转换为Blob
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
 
+        // 保存图片
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (isMobile) {
           try {
             // 尝试使用Web Share API
             if (navigator.share && navigator.canShare) {
-              const file = new File([blob], 'S自评报告.png', { type: 'image/png' })
-              const shareData = { files: [file] }
+              const file = new File([blob], 'S自评报告.png', { type: 'image/png' });
+              const shareData = { files: [file] };
               
               if (navigator.canShare(shareData)) {
-                await navigator.share(shareData)
-                setSnackbarMessage('图片已准备好分享！')
-                setSnackbarOpen(true)
-                return
+                await navigator.share(shareData);
+                setSnackbarMessage('图片已准备好分享！');
+                setSnackbarOpen(true);
+                return;
               }
             }
-
-            // 如果Web Share API不可用，尝试使用FileSaver API
-            if ('saveAs' in navigator) {
-              await navigator.saveAs(blob, 'S自评报告.png')
-              setSnackbarMessage('报告已保存到相册！')
-              setSnackbarOpen(true)
-              return
-            }
-
-            // 回退方案：使用传统的下载方法
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = 'S自评报告.png'
-            link.style.display = 'none'
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-            setSnackbarMessage('报告已保存为高清图片！')
-            setSnackbarOpen(true)
           } catch (error) {
-            console.error('保存图片错误:', error)
-            setSnackbarMessage('保存图片失败，请尝试使用系统自带的截图功能')
-            setSnackbarOpen(true)
+            console.error('分享失败:', error);
           }
-        } else {
-          // 桌面端使用传统下载方法
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = 'S自评报告.png'
-          link.click()
-          URL.revokeObjectURL(url)
-          setSnackbarMessage('报告已保存为高清图片！')
-          setSnackbarOpen(true)
         }
+
+        // 默认下载方法
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'S自评报告.png';
+        link.click();
+        URL.revokeObjectURL(url);
+        setSnackbarMessage('报告已保存为高清图片！');
+        setSnackbarOpen(true);
+
       } catch (error) {
-        console.error('导出图片错误:', error)
-        setSnackbarMessage('导出图片失败，请重试')
-        setSnackbarOpen(true)
+        console.error('导出图片错误:', error);
+        setSnackbarMessage('导出图片失败，请重试');
+        setSnackbarOpen(true);
       }
     }
   }
@@ -522,10 +453,9 @@ function SApp() {
               justifyContent: 'flex-end'
             }}>              
               <Button color="inherit" startIcon={<HomeIcon />} href="/index.html">首页</Button>
-              <Button color="inherit" startIcon={<InfoIcon />} onClick={() => setOpenAbout(true)}>关于</Button>
-              <Button color="inherit" startIcon={<HelpIcon />} onClick={() => setOpenGuide(true)}>使用指南</Button>
               <Button color="inherit" startIcon={<MaleIcon />} href="/male.html">男生版</Button>
               <Button color="inherit" startIcon={<FemaleIcon />} href="/female.html">女生版</Button>
+              <Button color="inherit" startIcon={<MessageIcon />} href="/message.html">留言板</Button>
             </Box>
 
             <IconButton
@@ -546,43 +476,21 @@ function SApp() {
       >
         <Box sx={{ width: 250, pt: 2 }}>
           <List>
-            <ListItem button onClick={() => {
-              const newRatings = {};
-              Object.entries(CATEGORIES).forEach(([category, items]) => {
-                items.forEach(item => {
-                  const randomIndex = Math.floor(Math.random() * RATING_OPTIONS.length);
-                  newRatings[`${category}-${item}`] = RATING_OPTIONS[randomIndex];
-                });
-              });
-              setRatings(newRatings);
-              setSnackbarMessage('已完成随机选择！');
-              setSnackbarOpen(true);
-              setMobileMenuOpen(false);
-            }}>
-              <ListItemIcon><AutorenewIcon /></ListItemIcon>
-              <ListItemText primary="随机选择" />
+            <ListItem button component="a" href="/index.html" onClick={() => setMobileMenuOpen(false)}>
+              <ListItemIcon><HomeIcon /></ListItemIcon>
+              <ListItemText primary="首页" />
             </ListItem>
-            {MENU_ITEMS.map((item, index) => (
-              <ListItem 
-                button 
-                key={index} 
-                onClick={item.onClick}
-                component={item.href ? 'a' : 'div'}
-                href={item.href}
-              >
-                <ListItemIcon>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItem>
-            ))}
-            <ListItem button component="a" href="/male.html">
+            <ListItem button component="a" href="/male.html" onClick={() => setMobileMenuOpen(false)}>
               <ListItemIcon><MaleIcon /></ListItemIcon>
-              <ListItemText primary="男性版" />
+              <ListItemText primary="男生版" />
             </ListItem>
-            <ListItem button component="a" href="/female.html">
+            <ListItem button component="a" href="/female.html" onClick={() => setMobileMenuOpen(false)}>
               <ListItemIcon><FemaleIcon /></ListItemIcon>
-              <ListItemText primary="女性版" />
+              <ListItemText primary="女生版" />
+            </ListItem>
+            <ListItem button component="a" href="/message.html" onClick={() => setMobileMenuOpen(false)}>
+              <ListItemIcon><MessageIcon /></ListItemIcon>
+              <ListItemText primary="留言板" />
             </ListItem>
           </List>
         </Box>
@@ -853,178 +761,79 @@ function SApp() {
             height: 'auto'
           }
         }}>
-          <Box sx={{ textAlign: 'center', mb: 2 }}>
-            <Typography variant="h5" className="section-title" sx={{ color: 'primary.main', mb: 3 }}>
-              S型人格雷达图
+          <Box ref={reportRef} sx={{ p: 3 }}>
+            <Typography variant="h4" gutterBottom align="center" sx={{ color: 'red', mb: 4 }}>
+              S型人格测试报告
             </Typography>
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'center',
-              width: '100%',
-              height: { xs: '300px', md: '400px' },
-              mb: 2
-            }}>
-              <RadarChart 
-                outerRadius={90} 
-                width={500} 
-                height={350} 
-                data={getRadarData()}
-              >
+
+            {/* 雷达图保留 */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+              <RadarChart width={600} height={400} data={getRadarData()}>
                 <PolarGrid />
                 <PolarAngleAxis dataKey="category" />
                 <PolarRadiusAxis angle={30} domain={[0, 6]} />
-                <Radar 
-                  name="S型人格" 
-                  dataKey="value" 
-                  stroke="#ff0000" 
-                  fill="#ff0000" 
-                  fillOpacity={0.6} 
-                />
-                <Legend />
+                <Radar name="得分" dataKey="value" stroke="#ff0000" fill="#ff0000" fillOpacity={0.6} />
               </RadarChart>
             </Box>
-          </Box>
 
-          {Object.entries(CATEGORIES).map(([category, items]) => (
-            <Box key={category} sx={{ mb: 4 }}>
-              <Typography variant="h6" className="section-title" sx={{ 
-                color: 'primary.main', 
-                mb: 2,
-                borderBottom: '1px solid #ff0000',
-                pb: 1
-              }}>
-                {category} 详细评分
-              </Typography>
-              <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column',
-                width: '100%',
-                height: { xs: '300px', md: '400px' },
-                mb: 2
-              }}>
-                <BarChart
-                  width={700}
-                  height={300}
-                  data={getBarData(category)}
-                  layout="vertical"
-                  margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 6]} />
-                  <YAxis dataKey="name" type="category" width={150} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" fill="#ff0000" />
-                </BarChart>
-              </Box>
-              <Box className="options-grid" sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
-                gap: 2,
-                mt: 2
-              }}>
-                {items.map(item => (
-                  <Box key={item} className="option-item" sx={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    p: 1.5,
-                    borderRadius: 1,
-                    backgroundColor: getRating(category, item) ? 
-                      `${getRatingColor(getRating(category, item))}20` : 
-                      'background.paper',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    borderLeft: getRating(category, item) ?
-                      `3px solid ${getRatingColor(getRating(category, item))}` :
-                      'none',
+            {/* 按评分分组展示所有项目 */}
+            {Object.entries(getGroupedRatings()).map(([rating, items]) => {
+              if (items.length === 0) return null
+              return (
+                <Box key={rating} sx={{ mb: 4 }}>
+                  <Typography variant="h5" sx={{ 
+                    color: getRatingColor(rating), 
+                    borderBottom: `2px solid ${getRatingColor(rating)}`,
+                    pb: 1,
+                    mb: 2
                   }}>
-                    <Typography sx={{ 
-                      fontWeight: 500,
-                      fontSize: '0.9rem',
-                      flexGrow: 1
-                    }}>
-                      {item}
-                    </Typography>
-                    <Typography className="rating-text" sx={{ 
-                      fontWeight: 'bold',
-                      color: getRating(category, item) ? 
-                        getRatingColor(getRating(category, item)) : 
-                        'text.secondary',
-                      backgroundColor: getRating(category, item) ? 
-                        `${getRatingColor(getRating(category, item))}20` : 
-                        'transparent',
-                      px: 1,
-                      py: 0.5,
-                      borderRadius: 1,
-                      minWidth: 40,
-                      textAlign: 'center'
-                    }}>
-                      {getRating(category, item) || '-'}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-          ))}
+                    {rating}级 ({items.length}项)
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {items.map(({category, item}, index) => (
+                      <Grid item xs={12} sm={6} md={4} key={`${category}-${item}-${index}`}>
+                        <Paper elevation={3} sx={{ 
+                          p: 2, 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          backgroundColor: `${getRatingColor(rating)}22`
+                        }}>
+                          <Typography>
+                            <strong>{category}:</strong> {item}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )
+            })}
 
-          <Paper elevation={2} sx={{ 
-            mt: 4, 
-            p: 3, 
-            borderRadius: 2,
-            backgroundColor: 'white',
-            maxWidth: '100%',
-            mx: 'auto',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-          }}>
-            <Typography variant="subtitle1" sx={{ 
-              fontWeight: 'bold', 
-              mb: 2, 
-              color: 'primary.main', 
+            {/* 添加二维码部分 */}
+            <Box sx={{ 
+              mt: 6, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center',
               textAlign: 'center',
-              fontSize: '1rem'
+              p: 3,
+              border: '2px solid #ff0000',
+              borderRadius: 2
             }}>
-              评分等级说明
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: { xs: 1, md: 2 } }}>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ fontWeight: 'bold', color: getRatingColor('SSS') }}>SSS</Box> = 极度喜欢
+              <Typography variant="h6" sx={{ mb: 2, color: '#ff0000' }}>
+                原生相机扫码领取您的XP报告
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ fontWeight: 'bold', color: getRatingColor('SS') }}>SS</Box> = 非常喜欢
-              </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ fontWeight: 'bold', color: getRatingColor('S') }}>S</Box> = 喜欢
-              </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ fontWeight: 'bold', color: getRatingColor('Q') }}>Q</Box> = 好奇
-              </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ fontWeight: 'bold', color: getRatingColor('N') }}>N</Box> = 不喜欢
-              </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ fontWeight: 'bold', color: getRatingColor('W') }}>W</Box> = 抵触
-              </Typography>
+              <Box 
+                component="img" 
+                src="/qrcode.png" 
+                alt="QR Code" 
+                sx={{
+                  width: 200,
+                  height: 200,
+                  display: 'block'
+                }}
+              />
             </Box>
-          </Paper>
-          
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-              此报告仅供参考，不构成任何专业建议。
-            </Typography>
-            <Box component="img" src="/qrcode.png" alt="QR Code" sx={{
-              width: '150px',
-              height: '150px',
-              display: 'block',
-              margin: '0 auto'
-            }} />
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-              扫码获取更多S型人格分析
-            </Typography>
           </Box>
         </DialogContent>
         <DialogActions sx={{ 
