@@ -5,11 +5,11 @@ import SendIcon from '@mui/icons-material/Send'
 import DeleteIcon from '@mui/icons-material/Delete'
 import LoginIcon from '@mui/icons-material/Login'
 import LogoutIcon from '@mui/icons-material/Logout'
-import ThumbUpIcon from '@mui/icons-material/ThumbUp'
-import ThumbDownIcon from '@mui/icons-material/ThumbDown'
+import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined'
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined'
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import PushPinIcon from '@mui/icons-material/PushPin'
-import ReplyIcon from '@mui/icons-material/Reply'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import './styles/pixel-theme.css'
@@ -285,8 +285,9 @@ const MessageBubble = ({
                 }
               })
             }}
+            title="点赞"
           >
-            <ThumbUpIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+            <ThumbUpOutlinedIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
             <Typography 
               variant="caption"
               className="reaction-count"
@@ -318,8 +319,9 @@ const MessageBubble = ({
                 }
               })
             }}
+            title="点踩"
           >
-            <ThumbDownIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+            <ThumbDownOutlinedIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
             <Typography 
               variant="caption"
               className="reaction-count"
@@ -351,8 +353,9 @@ const MessageBubble = ({
                 }
               })
             }}
+            title="回复"
           >
-            <ReplyIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+            <ChatBubbleOutlineIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
             <Typography 
               variant="caption"
               className="reaction-count"
@@ -560,11 +563,11 @@ const TopMessages = ({ messages }) => (
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ThumbUpIcon sx={{ fontSize: 16 }} />
+              <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
               {message.likes || 0}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ThumbDownIcon sx={{ fontSize: 16 }} />
+              <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />
               {message.dislikes || 0}
             </Box>
           </Typography>
