@@ -24,7 +24,14 @@ export const messagesApi = {
       // 首先获取所有消息
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
-        .select('*')
+        .select(`
+          id,
+          text,
+          original_text,
+          user_id,
+          created_at,
+          is_pinned
+        `)
         .order('created_at', { ascending: false }); // 先按时间排序，后面会重新排序
 
       if (messagesError) {
@@ -50,6 +57,15 @@ export const messagesApi = {
               .eq('message_id', message.id)
               .eq('is_like', true);
 
+            if (likesError) {
+              console.error(`获取消息 ${message.id} 的点赞数失败:`, likesError);
+              return {
+                ...message,
+                reactions: { likes: 0, dislikes: 0 },
+                reply_count: 0
+              };
+            }
+
             // 获取点踩数
             const { data: dislikes, error: dislikesError } = await supabase
               .from('message_reactions')
@@ -57,13 +73,31 @@ export const messagesApi = {
               .eq('message_id', message.id)
               .eq('is_like', false);
 
-            if (likesError) {
-              console.error(`获取消息 ${message.id} 的点赞数失败:`, likesError);
-              throw likesError;
-            }
             if (dislikesError) {
               console.error(`获取消息 ${message.id} 的点踩数失败:`, dislikesError);
-              throw dislikesError;
+              return {
+                ...message,
+                reactions: { likes: 0, dislikes: 0 },
+                reply_count: 0
+              };
+            }
+
+            // 获取回复数量
+            const { data: replies, error: repliesError } = await supabase
+              .from('message_replies')
+              .select('id')
+              .eq('message_id', message.id);
+
+            if (repliesError) {
+              console.error(`获取消息 ${message.id} 的回复数失败:`, repliesError);
+              return {
+                ...message,
+                reactions: {
+                  likes: likes?.length || 0,
+                  dislikes: dislikes?.length || 0
+                },
+                reply_count: 0
+              };
             }
 
             return {
@@ -71,17 +105,19 @@ export const messagesApi = {
               reactions: {
                 likes: likes?.length || 0,
                 dislikes: dislikes?.length || 0
-              }
+              },
+              reply_count: replies?.length || 0
             };
           } catch (error) {
-            console.error(`处理消息 ${message.id} 的反应数据时出错:`, error);
+            console.error(`处理消息 ${message.id} 的数据时出错:`, error);
             // 如果获取反应失败，返回原始消息，但反应数为0
             return {
               ...message,
               reactions: {
                 likes: 0,
                 dislikes: 0
-              }
+              },
+              reply_count: 0
             };
           }
         })
@@ -121,8 +157,7 @@ export const messagesApi = {
       return sortedMessages;
     } catch (error) {
       console.error('获取消息时发生错误:', error);
-      // 确保返回一个空数组而不是抛出错误
-      return [];
+      throw new Error('获取消息失败: ' + (error.message || '未知错误'));
     }
   },
 
@@ -267,16 +302,16 @@ export const messagesApi = {
   async checkDuplicateMessage(text, userId) {
     console.log('正在检查是否存在重复消息:', { userId });
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
         .eq('text', text)
         .eq('user_id', userId)
         .limit(1);
 
-      if (error) {
+    if (error) {
         console.error('检查重复消息失败:', error);
-        throw error;
+      throw error;
       }
 
       return data && data.length > 0;
@@ -296,23 +331,23 @@ export const messagesApi = {
         throw new Error('您已经发送过相同的留言了');
       }
 
-      const { data, error } = await supabase
-        .from('messages')
-        .insert([{
-          text,
-          user_id: userId,
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{
+        text,
+        user_id: userId,
           original_text: originalText,
           created_at: new Date().toISOString()
-        }])
-        .select();
+      }])
+      .select();
 
-      if (error) {
+    if (error) {
         console.error('创建消息失败:', error);
-        throw error;
-      }
+      throw error;
+    }
 
       console.log('消息创建成功:', data?.[0]?.id);
-      return data[0];
+    return data[0];
     } catch (error) {
       console.error('创建消息时发生错误:', error);
       throw new Error(error.message || '创建消息失败');
@@ -369,15 +404,15 @@ export const messagesApi = {
   async countUserMessagesInLast24Hours(userId) {
     console.log('正在统计用户24小时内的留言数:', userId);
     try {
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      const { count, error } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .gte('created_at', twentyFourHoursAgo);
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', twentyFourHoursAgo);
 
-      if (error) {
+    if (error) {
         console.error('统计消息数量失败:', error);
         throw error;
       }
@@ -391,104 +426,56 @@ export const messagesApi = {
   },
 
   // 切换消息置顶状态
-  async toggleMessagePin(messageId, isPinned, isAdmin = false) {
-    console.log('正在切换消息置顶状态:', { messageId, isPinned, isAdmin });
-    
+  async toggleMessagePin(messageId, isPinned) {
+    console.log('正在切换消息置顶状态:', { messageId, isPinned });
     try {
-      // 验证管理员权限
-      if (!isAdmin) {
-        console.error('非管理员尝试置顶消息');
-        throw new Error('只有管理员可以置顶消息');
-      }
-
-      // 首先检查消息是否存在
-      const { data: existingMessage, error: checkError } = await supabase
+      const { data, error } = await supabase
         .from('messages')
-        .select('*')
+        .update({ is_pinned: isPinned })
         .eq('id', messageId)
-        .maybeSingle();
+        .select()
+        .single();
 
-      console.log('检查消息结果:', { existingMessage, checkError });
-
-      if (checkError) {
-        console.error('检查消息失败:', checkError);
-        throw new Error('检查消息时出错');
+      if (error) {
+        console.error('切换置顶状态失败:', error);
+        throw error;
       }
 
-      if (!existingMessage) {
-        console.error('消息不存在:', messageId);
-        throw new Error('要操作的消息不存在');
-      }
-
-      console.log('找到要更新的消息:', existingMessage);
-
-      // 执行更新操作
-      const { error: updateError } = await supabase
-        .from('messages')
-        .update({
-          is_pinned: isPinned,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', messageId);
-
-      if (updateError) {
-        console.error('更新置顶状态失败:', updateError);
-        throw new Error('更新消息状态失败');
-      }
-
-      // 单独获取更新后的消息
-      const { data: updatedMessage, error: fetchError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('id', messageId)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('获取更新后的消息失败:', fetchError);
-        throw new Error('无法获取更新后的消息');
-      }
-
-      if (!updatedMessage) {
-        console.error('更新后未找到消息');
-        throw new Error('更新后未找到消息');
-      }
-
-      // 验证更新是否成功
-      if (updatedMessage.is_pinned !== isPinned) {
-        console.error('更新状态验证失败:', { 
-          expected: isPinned, 
-          actual: updatedMessage.is_pinned 
-        });
-        throw new Error('更新状态验证失败');
-      }
-
-      console.log('消息置顶状态已成功更新:', updatedMessage);
-      return updatedMessage;
+      console.log('消息置顶状态已更新:', data);
+      return data;
     } catch (error) {
       console.error('切换置顶状态时发生错误:', error);
       throw new Error('切换置顶状态失败: ' + (error.message || '未知错误'));
     }
   },
 
-  // 获取消息的所有回复
+  // 获取消息的回复
   async getMessageReplies(messageId) {
     console.log('正在获取消息回复:', messageId);
     try {
       const { data, error } = await supabase
         .from('message_replies')
-        .select('*')
+        .select(`
+          id,
+          message_id,
+          user_id,
+          text,
+          original_text,
+          created_at,
+          is_admin
+        `)
         .eq('message_id', messageId)
         .order('created_at', { ascending: true });
 
       if (error) {
         console.error('获取回复失败:', error);
-        throw error;
+        return [];
       }
 
       return data || [];
     } catch (error) {
       console.error('获取回复时发生错误:', error);
-      throw new Error('获取回复失败: ' + (error.message || '未知错误'));
+      return [];
     }
   },
 
@@ -496,10 +483,12 @@ export const messagesApi = {
   async createReply({ messageId, userId, text, originalText }) {
     console.log('正在创建回复:', { messageId, userId });
     try {
-      // 检查24小时内的回复数量
-      const replyCount = await this.countUserMessagesAndRepliesInLast24Hours(userId);
-      if (replyCount >= 6) {
-        throw new Error('您在24小时内的留言和回复总数已达到上限(6条)');
+      // 检查24小时内的回复数量（仅对非管理员用户）
+      if (userId !== 'admin') {
+        const replyCount = await this.countUserMessagesAndRepliesInLast24Hours(userId);
+        if (replyCount >= 6) {
+          throw new Error('您在24小时内的留言和回复总数已达到上限(6条)');
+        }
       }
 
       const { data, error } = await supabase

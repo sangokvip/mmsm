@@ -175,7 +175,8 @@ const MessageBubble = ({
   isAdmin,
   onReply,
   replies = [],
-  onDeleteReply
+  onDeleteReply,
+  currentUserId
 }) => {
   const [showReplies, setShowReplies] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -483,7 +484,7 @@ const MessageBubble = ({
               key={reply.id}
               reply={reply}
               onDelete={() => onDeleteReply(reply.id)}
-              isOwner={isAdmin || reply.user_id === userId}
+              isOwner={isAdmin || reply.user_id === currentUserId}
               isAdminMessage={reply.is_admin}
             />
           ))}
@@ -662,12 +663,49 @@ function MessageApp() {
   const [messageReplies, setMessageReplies] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [error, setError] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // 在组件挂载时设置状态
   useEffect(() => {
+    console.log('组件挂载');
     setIsMounted(true);
-    return () => setIsMounted(false);
+    return () => {
+      console.log('组件卸载');
+      setIsMounted(false);
+    };
   }, []);
+
+  // 获取消息的回复
+  const fetchMessageReplies = useCallback(async (messageId) => {
+    if (!userId || !isMounted) {
+      console.log('跳过获取回复：', { messageId, userId: !!userId, isMounted });
+      return;
+    }
+
+    try {
+      console.log('开始获取消息回复:', messageId);
+      const replies = await messagesApi.getMessageReplies(messageId);
+      if (!isMounted) {
+        console.log('组件已卸载，取消更新回复状态');
+        return;
+      }
+      
+      console.log('成功获取回复:', messageId, replies?.length || 0, '条');
+      setMessageReplies(prev => ({
+        ...prev,
+        [messageId]: replies || []
+      }));
+    } catch (error) {
+      if (!isMounted) return;
+      console.error('获取回复失败:', messageId, error);
+      // 设置空数组而不是抛出错误，这样即使回复加载失败也不会影响整个消息的显示
+      setMessageReplies(prev => ({
+        ...prev,
+        [messageId]: []
+      }));
+    }
+  }, [userId, isMounted]);
 
   // 从Supabase获取消息
   const fetchMessages = useCallback(async () => {
@@ -677,19 +715,25 @@ function MessageApp() {
     }
 
     try {
+      setError(null);
       setIsLoading(true);
-      console.log('开始获取消息...');
+      console.log('开始获取消息列表...');
       const data = await messagesApi.getMessages();
       
       // 确保组件仍然挂载
       if (!isMounted) {
-        console.log('组件已卸载，取消更新状态');
+        console.log('组件已卸载，取消更新消息状态');
         return;
       }
 
       console.log('获取到消息数据:', data?.length || 0, '条');
       if (Array.isArray(data)) {
         setMessages(data);
+        // 获取每条消息的回复
+        data.forEach(message => {
+          console.log('准备获取消息回复:', message.id);
+          fetchMessageReplies(message.id);
+        });
       } else {
         console.warn('获取到的消息数据格式不正确:', data);
         setMessages([]);
@@ -697,6 +741,7 @@ function MessageApp() {
     } catch (error) {
       if (!isMounted) return;
       console.error("获取消息失败:", error);
+      setError(error.message || '加载留言失败，请检查网络连接');
       setSnackbarMessage(`加载留言失败：${error.message || '请检查网络连接'}`);
       setSnackbarOpen(true);
       setMessages([]);
@@ -705,25 +750,34 @@ function MessageApp() {
         setIsLoading(false);
       }
     }
-  }, [userId, isMounted]);
+  }, [userId, isMounted, fetchMessageReplies]);
 
   // 获取热门消息
   const fetchTopMessages = useCallback(async () => {
-    if (!userId) {
-      console.log('用户ID未初始化，跳过获取热门消息');
+    if (!userId || !isMounted) {
+      console.log('跳过获取热门消息：', { userId: !!userId, isMounted });
       return;
     }
 
     try {
       console.log('开始获取热门消息...');
       const topMessages = await messagesApi.getTopMessages();
+      if (!isMounted) {
+        console.log('组件已卸载，取消更新热门消息状态');
+        return;
+      }
+      
       console.log('获取到热门消息:', topMessages?.length || 0, '条');
       setTopMessages(topMessages || []);
     } catch (error) {
+      if (!isMounted) {
+        console.log('组件已卸载，取消更新热门消息错误状态');
+        return;
+      }
       console.error('获取热门消息失败:', error);
       setTopMessages([]);
     }
-  }, [userId]);
+  }, [userId, isMounted]);
 
   // 获取消息反应
   const fetchMessageReactions = useCallback(async (messageId) => {
@@ -738,83 +792,57 @@ function MessageApp() {
     }
   }, []);
 
-  // 获取所有消息的回复
-  const fetchMessageReplies = useCallback(async (messageId) => {
-    try {
-      const replies = await messagesApi.getMessageReplies(messageId);
-      setMessageReplies(prev => ({
-        ...prev,
-        [messageId]: replies
-      }));
-    } catch (error) {
-      console.error('获取回复失败:', error);
-      setSnackbarMessage('获取回复失败');
-      setSnackbarOpen(true);
-    }
-  }, []);
-
-  // 初始化用户ID和消息
+  // 初始化用户ID
   useEffect(() => {
-    // 从cookie获取用户ID，如果不存在则创建新的UUID
-    let idFromCookie = document.cookie.match(/userId=([^;]+)/)?.[1];
-    let finalUserId;
-    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    try {
+      console.log('开始初始化用户ID...');
+      let idFromCookie = document.cookie.match(/userId=([^;]+)/)?.[1];
+      let finalUserId;
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-    if (idFromCookie) {
-      let potentialUserId = idFromCookie;
-      if (potentialUserId.startsWith('user_')) {
-        console.log("移除 'user_' 前缀:", potentialUserId);
-        potentialUserId = potentialUserId.substring(5);
-      }
+      if (idFromCookie) {
+        let potentialUserId = idFromCookie;
+        if (potentialUserId.startsWith('user_')) {
+          console.log("移除 'user_' 前缀:", potentialUserId);
+          potentialUserId = potentialUserId.substring(5);
+        }
 
-      if (uuidRegex.test(potentialUserId)) {
-        finalUserId = potentialUserId;
-        console.log("使用cookie中的有效UUID:", finalUserId);
+        if (uuidRegex.test(potentialUserId)) {
+          finalUserId = potentialUserId;
+          console.log("使用cookie中的有效UUID:", finalUserId);
+        } else {
+          console.log('Cookie中的UUID格式无效，生成新的UUID');
+          finalUserId = uuidv4();
+        }
       } else {
-        console.log('Cookie中的UUID格式无效，生成新的UUID');
+        console.log('Cookie中未找到UUID，生成新的UUID');
         finalUserId = uuidv4();
       }
-    } else {
-      console.log('Cookie中未找到UUID，生成新的UUID');
-      finalUserId = uuidv4();
-    }
 
-    // 保存到cookie
-    document.cookie = `userId=${finalUserId};path=/;max-age=31536000;SameSite=Lax`;
-    console.log("设置用户ID:", finalUserId);
-    setUserId(finalUserId);
+      // 保存到cookie，使用更长的过期时间
+      document.cookie = `userId=${finalUserId};path=/;max-age=31536000;SameSite=Lax`;
+      console.log("设置用户ID:", finalUserId);
+      setUserId(finalUserId);
+      setIsInitialized(true);
+    } catch (error) {
+      console.error('初始化用户ID失败:', error);
+      setError('初始化用户ID失败，请刷新页面重试');
+    }
   }, []);
 
   // 监听用户ID变化，加载消息
   useEffect(() => {
-    if (userId) {
+    if (userId && isMounted && isInitialized) {
       console.log('用户ID已设置，开始加载消息');
       fetchMessages();
       fetchTopMessages();
     }
-  }, [userId, fetchMessages, fetchTopMessages]);
-
-  // 定期刷新消息
-  useEffect(() => {
-    if (!userId) return;
-
-    console.log('设置消息自动刷新');
-    const refreshInterval = setInterval(() => {
-      console.log('执行定期刷新');
-      fetchMessages();
-      fetchTopMessages();
-    }, 30000);
-
-    return () => {
-      console.log('清理消息刷新定时器');
-      clearInterval(refreshInterval);
-    };
-  }, [userId, fetchMessages, fetchTopMessages]);
+  }, [userId, isMounted, isInitialized, fetchMessages, fetchTopMessages]);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (newMessage.trim()) {
-      // 检查留言频率限制
+      // 检查留言频率限制（仅对非管理员用户）
       if (!isAdmin) {
         try {
           const messageCount = await messagesApi.countUserMessagesInLast24Hours(userId);
@@ -831,8 +859,8 @@ function MessageApp() {
         }
       }
 
-      // 过滤联系方式
-      const filteredMessage = filterContactInfo(newMessage.trim());
+      // 过滤联系方式（管理员消息不过滤）
+      const filteredMessage = isAdmin ? newMessage.trim() : filterContactInfo(newMessage.trim());
       
       // 准备消息数据
       const messageData = {
@@ -847,14 +875,13 @@ function MessageApp() {
           setSnackbarMessage('留言似乎成功，但服务器未返回确认信息');
           setSnackbarOpen(true);
         } else {
-          await fetchMessages();
+          await fetchMessages(); // 只在发送消息成功后刷新
           setNewMessage('');
           setSnackbarMessage('留言成功！');
           setSnackbarOpen(true);
         }
       } catch (error) {
         console.error("详细错误信息:", error);
-        // 处理特定的错误消息
         if (error.message.includes('相同的留言')) {
           setSnackbarMessage('您已经发送过相同的留言了');
         } else {
@@ -864,55 +891,13 @@ function MessageApp() {
         setSnackbarOpen(true);
       }
     }
-  }
-
-  const handleDelete = async (messageId, messageUserId) => {
-    console.log('Handling delete:', { messageId, messageUserId, userId, isAdmin });
-    try {
-      // 显示删除中的提示
-      setSnackbarMessage('正在删除...');
-      setSnackbarOpen(true);
-
-      const success = await messagesApi.deleteMessage(messageId, userId, isAdmin);
-      console.log('Message deleted, success:', success);
-      
-      if (success) {
-        // 删除成功后立即重新获取消息列表
-        await fetchMessages();
-        setSnackbarMessage('删除成功！');
-      }
-    } catch (error) {
-      console.error("删除消息时出错:", error);
-      setSnackbarMessage(`删除失败：${error.message}`);
-    } finally {
-      setSnackbarOpen(true);
-    }
-  }
-
-  const handleLogin = () => {
-    if (password === 'Sangok#3') {
-      setIsAdmin(true)
-      setOpenLogin(false)
-      setPassword('')
-      setSnackbarMessage('管理员登录成功！')
-      setSnackbarOpen(true)
-    } else {
-      setSnackbarMessage('密码错误！')
-      setSnackbarOpen(true)
-    }
-  }
-
-  const handleLogout = () => {
-    setIsAdmin(false)
-    setSnackbarMessage('已退出管理员模式！')
-    setSnackbarOpen(true)
-  }
+  };
 
   // 处理反应（点赞/踩）
   const handleReaction = async (messageId, isLike) => {
     try {
       await messagesApi.addReaction(messageId, userId, isLike);
-      await fetchMessages(); // 重新获取消息列表以更新点赞数
+      await fetchMessages(); // 只在反应操作成功后刷新
       await fetchTopMessages(); // 更新热门留言榜
     } catch (error) {
       console.error('反应操作失败:', error);
@@ -923,100 +908,28 @@ function MessageApp() {
 
   // 处理置顶切换
   const handleTogglePin = async (messageId, isPinned) => {
-    if (!messageId) {
-      console.error('无效的消息ID:', messageId);
-      setSnackbarMessage('操作失败：无效的消息ID');
-      setSnackbarOpen(true);
-      return;
-    }
-
-    if (!isAdmin) {
-      console.error('非管理员尝试置顶消息');
-      setSnackbarMessage('只有管理员可以置顶消息');
-      setSnackbarOpen(true);
-      return;
-    }
-
-    let originalMessages = null;
     try {
-      // 保存原始消息列表，以便在出错时恢复
-      originalMessages = [...messages];
-
-      // 显示操作进行中的状态
-      setSnackbarMessage(isPinned ? '正在置顶消息...' : '正在取消置顶...');
+      await messagesApi.toggleMessagePin(messageId, isPinned);
+      await fetchMessages(); // 只在置顶操作成功后刷新
+      setSnackbarMessage(isPinned ? '消息已置顶' : '消息已取消置顶');
       setSnackbarOpen(true);
-
-      // 更新本地状态以提供即时反馈
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, is_pinned: isPinned }
-            : msg
-        )
-      );
-
-      // 执行服务器端更新
-      const updatedMessage = await messagesApi.toggleMessagePin(messageId, isPinned, isAdmin);
-      console.log('置顶状态更新成功:', updatedMessage);
-
-      // 更新本地状态以反映服务器端的更改
-      setMessages(prevMessages =>
-        prevMessages.map(msg =>
-          msg.id === messageId ? { ...msg, ...updatedMessage } : msg
-        )
-      );
-      
-      // 显示成功消息
-      setSnackbarMessage(isPinned ? '消息已成功置顶' : '消息已取消置顶');
-      setSnackbarOpen(true);
-
-      // 延迟重新获取消息列表以确保数据同步
-      setTimeout(() => {
-        fetchMessages();
-      }, 500);
     } catch (error) {
-      console.error('置顶操作失败:', error);
-      
-      // 恢复原始状态
-      if (originalMessages) {
-        setMessages(originalMessages);
-      }
-      
-      // 显示错误消息
-      let errorMessage = '操作失败';
-      if (error.message.includes('权限')) {
-        errorMessage = '只有管理员可以置顶消息';
-      } else if (error.message.includes('不存在')) {
-        errorMessage = '找不到要操作的消息，可能已被删除';
-      } else if (error.message.includes('验证失败')) {
-        errorMessage = '更新状态失败，请重试';
-      } else if (error.message.includes('未找到消息')) {
-        errorMessage = '消息可能已被删除，请刷新页面';
-      } else {
-        errorMessage = `操作失败: ${error.message || '请稍后重试'}`;
-      }
-      
-      setSnackbarMessage(errorMessage);
+      setSnackbarMessage(error.message || '操作失败');
       setSnackbarOpen(true);
-
-      // 延迟重新获取消息列表
-      setTimeout(() => {
-        fetchMessages();
-      }, 1000);
     }
   };
 
   // 创建回复
   const handleCreateReply = async (messageId, text) => {
     try {
-      const filteredText = filterContactInfo(text);
+      const filteredText = isAdmin ? text : filterContactInfo(text);
       await messagesApi.createReply({
         messageId,
         userId: isAdmin ? 'admin' : userId,
         text: filteredText,
         originalText: text
       });
-      await fetchMessageReplies(messageId);
+      await fetchMessageReplies(messageId); // 只刷新当前消息的回复
       setSnackbarMessage('回复成功！');
       setSnackbarOpen(true);
     } catch (error) {
@@ -1037,6 +950,165 @@ function MessageApp() {
       setSnackbarMessage(error.message || '删除回复失败');
       setSnackbarOpen(true);
     }
+  };
+
+  // 删除消息
+  const handleDelete = async (messageId, messageUserId) => {
+    console.log('Handling delete:', { messageId, messageUserId, userId, isAdmin });
+    try {
+      setSnackbarMessage('正在删除...');
+      setSnackbarOpen(true);
+
+      const success = await messagesApi.deleteMessage(messageId, userId, isAdmin);
+      console.log('Message deleted, success:', success);
+      
+      if (success) {
+        await fetchMessages(); // 只在删除成功后刷新
+        setSnackbarMessage('删除成功！');
+      }
+    } catch (error) {
+      console.error("删除消息时出错:", error);
+      setSnackbarMessage(`删除失败：${error.message}`);
+    } finally {
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleLogin = () => {
+    if (password === 'Sangok#3') {
+      setIsAdmin(true)
+      setOpenLogin(false)
+      setPassword('')
+      setSnackbarMessage('管理员登录成功！')
+      setSnackbarOpen(true)
+    } else {
+      setSnackbarMessage('密码错误！')
+      setSnackbarOpen(true)
+    }
+  }
+
+  const handleLogout = () => {
+    setIsAdmin(false)
+    setSnackbarMessage('已退出管理员模式！')
+    setSnackbarOpen(true)
+  }
+
+  // 渲染主要内容
+  const renderContent = () => {
+    if (!isInitialized) {
+      return (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '200px',
+          gap: 2
+        }}>
+          <CircularProgress sx={{ color: '#ff69b4' }} />
+          <Typography variant="h6" sx={{ color: '#ff69b4' }}>
+            正在初始化...
+          </Typography>
+        </Box>
+      );
+    }
+
+    if (error) {
+      return (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '200px',
+          gap: 2
+        }}>
+          <Typography variant="h6" sx={{ color: '#ff69b4' }}>
+            {error}
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setError(null);
+              fetchMessages();
+            }}
+            sx={{
+              backgroundColor: '#ff69b4',
+              '&:hover': {
+                backgroundColor: '#ff8dc3',
+              },
+            }}
+          >
+            重试
+          </Button>
+        </Box>
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '200px',
+          gap: 2
+        }}>
+          <CircularProgress sx={{ color: '#ff69b4' }} />
+          <Typography variant="h6" sx={{ color: '#ff69b4' }}>
+            加载中...
+          </Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ 
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, 1fr)',
+          md: 'repeat(3, 1fr)',
+        },
+        gap: { xs: 2, sm: 2, md: 3 },
+        width: '100%'
+      }}>
+        {messages.length > 0 ? (
+          messages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={isAdmin ? message.original_text : message.text}
+              originalText={message.original_text}
+              onDelete={() => handleDelete(message.id, message.user_id)}
+              isOwner={isAdmin || message.user_id === userId}
+              isAdminMessage={message.user_id === 'admin'}
+              onReact={(isLike) => handleReaction(message.id, isLike)}
+              reactions={message.reactions || { likes: 0, dislikes: 0 }}
+              isPinned={message.is_pinned}
+              onTogglePin={(isPinned) => handleTogglePin(message.id, isPinned)}
+              isAdmin={isAdmin}
+              onReply={(text) => handleCreateReply(message.id, text)}
+              replies={messageReplies[message.id] || []}
+              onDeleteReply={handleDeleteReply}
+              currentUserId={userId}
+            />
+          ))
+        ) : (
+          <Box sx={{ 
+            gridColumn: '1 / -1',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '200px'
+          }}>
+            <Typography variant="h6" sx={{ color: '#ff69b4' }}>
+              暂无留言
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    );
   };
 
   return (
@@ -1098,7 +1170,7 @@ function MessageApp() {
                 maxWidth: '100%'
               }
             }}>
-              {/* 热门留言榜 - 在大屏幕上限制最大宽度 */}
+              {/* 热门留言榜 */}
               <Box sx={{
                 maxWidth: { md: '800px' },
                 mx: 'auto',
@@ -1107,71 +1179,12 @@ function MessageApp() {
                 <TopMessages messages={topMessages} />
               </Box>
               
-              {/* 加载状态显示 */}
-              {isLoading ? (
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  justifyContent: 'center', 
-                  alignItems: 'center', 
-                  minHeight: '200px',
-                  width: '100%',
-                  gap: 2
-                }}>
-                  <CircularProgress sx={{ color: '#ff69b4' }} />
-                  <Typography variant="h6" sx={{ color: '#ff69b4' }}>
-                    加载中...
-                  </Typography>
-                </Box>
-              ) : (
-                /* 留言列表 - 响应式网格布局 */
-                <Box sx={{ 
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(2, 1fr)',
-                    md: 'repeat(3, 1fr)',
-                  },
-                  gap: { xs: 2, sm: 2, md: 3 },
-                  width: '100%'
-                }}>
-                  {messages.length > 0 ? (
-                    messages.map((message) => (
-                      <MessageBubble
-                        key={message.id}
-                        message={isAdmin ? message.original_text : message.text}
-                        originalText={message.original_text}
-                        onDelete={() => handleDelete(message.id, message.user_id)}
-                        isOwner={isAdmin || message.user_id === userId}
-                        isAdminMessage={message.user_id === 'admin'}
-                        onReact={(isLike) => handleReaction(message.id, isLike)}
-                        reactions={message.reactions || { likes: 0, dislikes: 0 }}
-                        isPinned={!!message.is_pinned}
-                        onTogglePin={(isPinned) => handleTogglePin(message.id, isPinned)}
-                        isAdmin={isAdmin}
-                        onReply={(text) => handleCreateReply(message.id, text)}
-                        replies={messageReplies[message.id] || []}
-                        onDeleteReply={handleDeleteReply}
-                      />
-                    ))
-                  ) : (
-                    <Box sx={{ 
-                      gridColumn: '1 / -1',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      minHeight: '200px'
-                    }}>
-                      <Typography variant="h6" sx={{ color: '#ff69b4' }}>
-                        暂无留言
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              )}
+              {/* 主要内容区域 */}
+              {renderContent()}
             </Box>
           </Container>
           
+          {/* 底部输入框 */}
           <Paper
             component="form"
             onSubmit={handleSubmit}
@@ -1233,33 +1246,6 @@ function MessageApp() {
             </Button>
           </Paper>
 
-          <style jsx global>{`
-            @keyframes float {
-              0%, 100% { transform: translateY(0); }
-              50% { transform: translateY(-10px); }
-            }
-            .pixel-bubble {
-              background-color: #fff0f5 !important;
-            }
-            .admin-bubble {
-              position: relative;
-              overflow: visible !important;
-            }
-            .admin-bubble::after {
-              content: '★';
-              position: absolute;
-              top: -15px;
-              right: -15px;
-              color: #ff69b4;
-              font-size: 24px;
-              animation: spin 2s linear infinite;
-            }
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `}</style>
-
           <Snackbar
             open={snackbarOpen}
             autoHideDuration={3000}
@@ -1290,7 +1276,7 @@ function MessageApp() {
         </Box>
       </ThemeProvider>
     </ErrorBoundary>
-  )
+  );
 }
 
 export default MessageApp

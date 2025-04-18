@@ -267,7 +267,7 @@ function App() {
 
         // 清理临时元素
         document.body.removeChild(container);
-
+        
         // 将Canvas转换为Blob
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
 
@@ -283,30 +283,30 @@ function App() {
               if (navigator.canShare(shareData)) {
                 await navigator.share(shareData);
                 setSnackbarMessage('图片已准备好分享！');
-                setSnackbarOpen(true);
-                return;
+              setSnackbarOpen(true);
+              return;
               }
             }
-          } catch (error) {
+            } catch (error) {
             console.error('分享失败:', error);
           }
-        }
+            }
 
         // 默认下载方法
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
         link.download = 'M自评报告.png';
-        link.click();
-        URL.revokeObjectURL(url);
-        setSnackbarMessage('报告已保存为高清图片！');
-        setSnackbarOpen(true);
+              link.click();
+                URL.revokeObjectURL(url);
+              setSnackbarMessage('报告已保存为高清图片！');
+              setSnackbarOpen(true);
 
-      } catch (error) {
+          } catch (error) {
         console.error('导出图片错误:', error);
         setSnackbarMessage('导出图片失败，请重试');
-        setSnackbarOpen(true);
-      }
+            setSnackbarOpen(true);
+          }
     }
   }
 
@@ -831,15 +831,15 @@ function App() {
               {/* 雷达图部分 */}
               <Box 
                 sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
                   width: '100%',
                   height: '400px',
                   mb: 4 
                 }}
               >
-                <RadarChart 
+                <RadarChart
                   width={600} 
                   height={400} 
                   data={getRadarData()}
@@ -864,24 +864,24 @@ function App() {
                       mb: 2
                     }}>
                       {rating}级 ({items.length}项)
-                    </Typography>
+                </Typography>
                     <Grid container spacing={2}>
                       {items.map(({category, item}, index) => (
                         <Grid item xs={12} sm={6} md={4} key={`${category}-${item}-${index}`}>
                           <Paper elevation={3} sx={{ 
                             p: 2, 
-                            display: 'flex', 
-                            alignItems: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
                             backgroundColor: `${getRatingColor(rating)}22`
                           }}>
                             <Typography>
                               <strong>{category}:</strong> {item}
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                      ))}
+                        </Typography>
+                      </Paper>
                     </Grid>
-                  </Box>
+                  ))}
+                </Grid>
+              </Box>
                 )
               })}
 
@@ -894,7 +894,7 @@ function App() {
                 textAlign: 'center',
                 p: 3,
                 border: '2px solid #1E3D59',
-                borderRadius: 2,
+              borderRadius: 2,
                 backgroundColor: '#ffffff'
               }}>
                 <Typography variant="h6" sx={{ mb: 2, color: '#1E3D59' }}>
@@ -937,7 +937,7 @@ function App() {
             </Button>
           </DialogActions>
           <IconButton
-            onClick={() => setOpenReport(false)}
+              onClick={() => setOpenReport(false)}
             sx={{
               position: 'absolute',
               right: 8,
