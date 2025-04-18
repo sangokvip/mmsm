@@ -12,6 +12,7 @@ import PushPinIcon from '@mui/icons-material/PushPin'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
+import EditIcon from '@mui/icons-material/Edit'
 import './styles/pixel-theme.css'
 import { messagesApi } from './utils/supabase'
 import { v4 as uuidv4 } from 'uuid'; // 导入 uuid
@@ -193,7 +194,9 @@ const MessageBubble = ({
   onReply,
   replies = [],
   onDeleteReply,
-  currentUserId
+  currentUserId,
+  onEditReactions,
+  messageId
 }) => {
   const [showReplies, setShowReplies] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -283,28 +286,30 @@ const MessageBubble = ({
         borderTop: '1px solid rgba(0,0,0,0.1)',
       }}>
         <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 } }}>
-          <IconButton
-            size="small"
-            onClick={() => onReact(true)}
-            sx={{
-              color: '#ff69b4',
-              padding: { xs: 0.5, sm: 1 },
-              '&:hover': { 
-                color: '#ff8dc3',
-                transform: 'scale(1.1)'
-              },
-              transition: 'transform 0.2s ease, color 0.2s ease',
-              ...(isAdminMessage && {
-                color: '#ffffff',
-                '&:hover': {
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              onClick={() => onReact(true)}
+              sx={{
+                color: '#ff69b4',
+                padding: { xs: 0.5, sm: 1 },
+                '&:hover': { 
                   color: '#ff8dc3',
                   transform: 'scale(1.1)'
-                }
-              })
-            }}
-            title="点赞"
-          >
-            <ThumbUpOutlinedIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                },
+                transition: 'transform 0.2s ease, color 0.2s ease',
+                ...(isAdminMessage && {
+                  color: '#ffffff',
+                  '&:hover': {
+                    color: '#ff8dc3',
+                    transform: 'scale(1.1)'
+                  }
+                })
+              }}
+              title="点赞"
+            >
+              <ThumbUpOutlinedIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+            </IconButton>
             <Typography 
               variant="caption"
               className="reaction-count"
@@ -316,29 +321,50 @@ const MessageBubble = ({
             >
               {reactions?.likes || 0}
             </Typography>
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => onReact(false)}
-            sx={{
-              color: '#ff69b4',
-              padding: { xs: 0.5, sm: 1 },
-              '&:hover': { 
-                color: '#ff8dc3',
-                transform: 'scale(1.1)'
-              },
-              transition: 'transform 0.2s ease, color 0.2s ease',
-              ...(isAdminMessage && {
-                color: '#ffffff',
-                '&:hover': {
+            {isAdmin && (
+              <IconButton
+                size="small"
+                onClick={() => onEditReactions(messageId, 'likes', reactions?.likes || 0)}
+                sx={{
+                  color: isAdminMessage ? '#ffffff' : '#ff69b4',
+                  padding: { xs: 0.2, sm: 0.5 },
+                  ml: 0.5,
+                  '&:hover': { 
+                    color: '#ff8dc3',
+                    transform: 'scale(1.1)'
+                  }
+                }}
+                title="修改点赞数"
+              >
+                <EditIcon sx={{ fontSize: { xs: '0.75rem', sm: '1rem' } }} />
+              </IconButton>
+            )}
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              onClick={() => onReact(false)}
+              sx={{
+                color: '#ff69b4',
+                padding: { xs: 0.5, sm: 1 },
+                '&:hover': { 
                   color: '#ff8dc3',
                   transform: 'scale(1.1)'
-                }
-              })
-            }}
-            title="点踩"
-          >
-            <ThumbDownOutlinedIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                },
+                transition: 'transform 0.2s ease, color 0.2s ease',
+                ...(isAdminMessage && {
+                  color: '#ffffff',
+                  '&:hover': {
+                    color: '#ff8dc3',
+                    transform: 'scale(1.1)'
+                  }
+                })
+              }}
+              title="点踩"
+            >
+              <ThumbDownOutlinedIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+            </IconButton>
             <Typography 
               variant="caption"
               className="reaction-count"
@@ -350,7 +376,26 @@ const MessageBubble = ({
             >
               {reactions?.dislikes || 0}
             </Typography>
-          </IconButton>
+            {isAdmin && (
+              <IconButton
+                size="small"
+                onClick={() => onEditReactions(messageId, 'dislikes', reactions?.dislikes || 0)}
+                sx={{
+                  color: isAdminMessage ? '#ffffff' : '#ff69b4',
+                  padding: { xs: 0.2, sm: 0.5 },
+                  ml: 0.5,
+                  '&:hover': { 
+                    color: '#ff8dc3',
+                    transform: 'scale(1.1)'
+                  }
+                }}
+                title="修改点踩数"
+              >
+                <EditIcon sx={{ fontSize: { xs: '0.75rem', sm: '1rem' } }} />
+              </IconButton>
+            )}
+          </Box>
+          
           <IconButton
             size="small"
             onClick={() => setIsReplying(!isReplying)}
@@ -683,6 +728,13 @@ function MessageApp() {
   const [isMounted, setIsMounted] = useState(false);
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [editReactionDialog, setEditReactionDialog] = useState({
+    open: false,
+    messageId: null,
+    type: 'likes', // 'likes' 或 'dislikes'
+    count: 0
+  });
+  const [newReactionCount, setNewReactionCount] = useState(0);
 
   // 在组件挂载时设置状态
   useEffect(() => {
@@ -935,8 +987,41 @@ function MessageApp() {
   const handleReaction = async (messageId, isLike) => {
     try {
       await messagesApi.addReaction(messageId, userId, isLike);
-      await fetchMessages(); // 只在反应操作成功后刷新
-      await fetchTopMessages(); // 更新热门留言榜
+      
+      // 不再调用fetchMessages()和fetchTopMessages()进行整页刷新
+      // 而是只更新当前消息的反应数据
+      
+      // 本地更新当前消息的反应计数
+      setMessages(prevMessages => {
+        return prevMessages.map(msg => {
+          if (msg.id === messageId) {
+            // 更新当前消息的反应计数
+            const updatedReactions = { ...msg.reactions };
+            if (isLike) {
+              updatedReactions.likes = (updatedReactions.likes || 0) + 1;
+            } else {
+              updatedReactions.dislikes = (updatedReactions.dislikes || 0) + 1;
+            }
+            return { ...msg, reactions: updatedReactions };
+          }
+          return msg;
+        });
+      });
+      
+      // 本地更新热门消息的反应计数（如果消息在热门列表中）
+      setTopMessages(prevTopMessages => {
+        return prevTopMessages.map(msg => {
+          if (msg.id === messageId) {
+            if (isLike) {
+              return { ...msg, likes: (msg.likes || 0) + 1 };
+            } else {
+              return { ...msg, dislikes: (msg.dislikes || 0) + 1 };
+            }
+          }
+          return msg;
+        });
+      });
+      
     } catch (error) {
       console.error('反应操作失败:', error);
       setSnackbarMessage(error.message || '操作失败，请稍后重试');
@@ -1016,6 +1101,43 @@ function MessageApp() {
     setIsAdmin(false);
     setSnackbarMessage('已退出管理员模式！');
     setSnackbarOpen(true);
+  };
+
+  // 处理修改反应数量
+  const handleEditReactions = (messageId, type, currentCount) => {
+    setEditReactionDialog({
+      open: true,
+      messageId,
+      type,
+      count: currentCount
+    });
+    setNewReactionCount(currentCount);
+  };
+
+  // 提交修改反应数量
+  const handleSubmitReactionEdit = async () => {
+    try {
+      // 调用API更新反应数量
+      const success = await messagesApi.updateReactionCount(
+        editReactionDialog.messageId,
+        editReactionDialog.type,
+        newReactionCount
+      );
+      
+      if (success) {
+        await fetchMessages(); // 刷新消息列表
+        await fetchTopMessages(); // 更新热门消息
+        setSnackbarMessage(`成功修改${editReactionDialog.type === 'likes' ? '点赞' : '点踩'}数量`);
+      } else {
+        setSnackbarMessage('修改反应数量失败');
+      }
+    } catch (error) {
+      console.error('修改反应数量失败:', error);
+      setSnackbarMessage(error.message || '修改反应数量失败');
+    } finally {
+      setSnackbarOpen(true);
+      setEditReactionDialog({...editReactionDialog, open: false});
+    }
   };
 
   // 渲染主要内容
@@ -1103,6 +1225,7 @@ function MessageApp() {
           messages.map((message) => (
             <MessageBubble
               key={message.id}
+              messageId={message.id}
               message={isAdmin ? message.original_text : message.text}
               originalText={message.original_text}
               onDelete={() => handleDelete(message.id, message.user_id)}
@@ -1117,6 +1240,7 @@ function MessageApp() {
               replies={messageReplies[message.id] || []}
               onDeleteReply={handleDeleteReply}
               currentUserId={userId}
+              onEditReactions={handleEditReactions}
             />
           ))
         ) : (
@@ -1280,11 +1404,6 @@ function MessageApp() {
                     borderColor: '#ff69b4',
                   },
                 },
-                '& .MuiFormHelperText-root': {
-                  color: newMessage.length > 180 ? '#ff4081' : '#666',
-                  marginLeft: 'auto',
-                  marginRight: 0
-                }
               }}
             />
             <Button
@@ -1305,6 +1424,61 @@ function MessageApp() {
               发送
             </Button>
           </Paper>
+
+          {/* 添加编辑反应计数对话框 */}
+          <Dialog 
+            open={editReactionDialog.open} 
+            onClose={() => setEditReactionDialog({...editReactionDialog, open: false})}
+          >
+            <DialogTitle sx={{ color: '#ff69b4' }}>
+              修改{editReactionDialog.type === 'likes' ? '点赞' : '点踩'}数量
+            </DialogTitle>
+            <DialogContent>
+              <TextField
+                autoFocus
+                margin="dense"
+                label={`${editReactionDialog.type === 'likes' ? '点赞' : '点踩'}数量`}
+                type="number"
+                fullWidth
+                value={newReactionCount}
+                onChange={(e) => setNewReactionCount(parseInt(e.target.value) || 0)}
+                inputProps={{ min: 0 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: '#ff69b4',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#ff69b4',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#ff69b4',
+                    },
+                  },
+                }}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button 
+                onClick={() => setEditReactionDialog({...editReactionDialog, open: false})}
+                sx={{ color: '#ff69b4' }}
+              >
+                取消
+              </Button>
+              <Button 
+                onClick={handleSubmitReactionEdit} 
+                sx={{ 
+                  backgroundColor: '#ff69b4', 
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: '#ff8dc3',
+                  },
+                }}
+              >
+                确认
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           <Snackbar
             open={snackbarOpen}
