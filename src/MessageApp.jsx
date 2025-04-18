@@ -88,6 +88,17 @@ const filterContactInfo = (text) => {
   // 邮箱
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
+  // 敏感词及其变体
+  const sensitiveWords = [
+    '王晓然', 'wangxiaoran', 'wang xiaoran', 
+    '王晓玥', 'wangxiaoyue', 'wang xiaoyue',
+    'SOAP', 'soap', 'Soap',
+    '女装', 'nvzhuang', 'nu zhuang',
+    '塔罗牌', 'taluopai', 'taluo pai', 'tarot',
+    '宏程', 'hongcheng', 'hong cheng',
+    '王老师', 'wanglaoshi', 'wang laoshi'
+  ];
+
   let filteredText = text;
   
   // 替换所有匹配的联系方式为星号
@@ -95,6 +106,12 @@ const filterContactInfo = (text) => {
   filteredText = filteredText.replace(wechatRegex, match => '*'.repeat(match.length));
   filteredText = filteredText.replace(qqRegex, match => '*'.repeat(match.length));
   filteredText = filteredText.replace(emailRegex, match => '*'.repeat(match.length));
+
+  // 替换所有敏感词为星号
+  sensitiveWords.forEach(word => {
+    const regex = new RegExp(word, 'gi');
+    filteredText = filteredText.replace(regex, match => '*'.repeat(match.length));
+  });
 
   return filteredText;
 };
